@@ -4,12 +4,28 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>婚活ノート</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&display=swap');
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: linear-gradient(135deg, #fff0f5 0%, #fce4ec 50%, #f8e8f0 100%); color: #4a3040; min-height: 100vh; }
 
 .container { max-width: 520px; margin: 0 auto; padding: 16px; }
+
+.login-overlay { position: fixed; inset: 0; background: linear-gradient(135deg, #fff0f5 0%, #fce4ec 50%, #f8e8f0 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; gap: 20px; }
+.login-overlay h1 { font-size: 28px; color: #d4619b; letter-spacing: 3px; }
+.login-overlay p { font-size: 14px; color: #c0507e; text-align: center; line-height: 1.8; }
+.login-btn { display: flex; align-items: center; gap: 10px; padding: 14px 28px; border-radius: 14px; border: 2px solid #f4c2d7; background: #fff; font-size: 15px; font-weight: 700; color: #4a3040; cursor: pointer; font-family: inherit; transition: all 0.2s; box-shadow: 0 2px 10px rgba(212,97,155,0.12); }
+.login-btn:hover { background: #fff5f8; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(212,97,155,0.2); }
+.login-btn img { width: 22px; height: 22px; }
+
+.user-bar { display: none; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(135deg, #fff 0%, #fff5f8 100%); border-radius: 14px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(212,97,155,0.10); border: 1px solid #f9dae8; }
+.user-photo { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #f4c2d7; }
+.user-name { flex: 1; font-size: 13px; font-weight: 700; color: #4a3040; }
+.logout-btn { padding: 6px 14px; border-radius: 10px; border: 2px solid #f4c2d7; background: #fff; font-size: 11px; font-weight: 700; color: #c0507e; cursor: pointer; font-family: inherit; }
+.logout-btn:hover { background: #fce4ec; }
 
 .header { text-align: center; padding: 24px 0 10px; }
 .header h1 { font-size: 22px; font-weight: 700; color: #d4619b; letter-spacing: 2px; }
@@ -114,10 +130,29 @@ body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hirag
 .export-bar { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
 .export-btn { padding: 8px 16px; border-radius: 12px; border: 2px solid #f4c2d7; background: #fff; font-size: 12px; font-weight: 700; color: #c0507e; cursor: pointer; font-family: inherit; transition: all 0.2s; }
 .export-btn:hover { background: #fce4ec; }
+
+.sync-badge { font-size: 10px; color: #43a047; background: #e8f5e9; padding: 2px 8px; border-radius: 8px; font-weight: 700; }
 </style>
 </head>
 <body>
-<div class="container">
+
+<div class="login-overlay" id="loginOverlay">
+  <h1>婚活ノート</h1>
+  <p>すてきな出会いを記録しよう<br>Googleアカウントでログインすると<br>スマホとパソコンでデータが同期されます</p>
+  <button class="login-btn" onclick="googleLogin()">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G">
+    Googleでログイン
+  </button>
+</div>
+
+<div class="container" id="appContainer" style="display:none;">
+  <div class="user-bar" id="userBar">
+    <img class="user-photo" id="userPhoto" src="" alt="">
+    <span class="user-name" id="userName"></span>
+    <span class="sync-badge">同期中</span>
+    <button class="logout-btn" onclick="logout()">ログアウト</button>
+  </div>
+
   <div class="header">
     <h1>婚活ノート</h1>
     <p>すてきな出会いを記録しよう</p>
@@ -241,19 +276,86 @@ body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hirag
 </div>
 
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDODYeWcT_Bl4DrstKpPmgWF-WJu5XeO8c",
+  authDomain: "konkatsu-note.firebaseapp.com",
+  projectId: "konkatsu-note",
+  storageBucket: "konkatsu-note.firebasestorage.app",
+  messagingSenderId: "1029756965278",
+  appId: "1:1029756965278:web:ccaa575cd827b16cb6068f"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
 const STORAGE_KEY = 'deai-note-data';
 const METHOD_LABELS = { app: 'アプリ', intro: '紹介', machikon: '街コン', event: 'イベント', work: '仕事', other: 'その他' };
 const STATUS_LABELS = { talking: 'やりとり中', dating: 'デート済', good: 'いい感じ', pending: '保留', ended: '終了' };
-let people = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let people = [];
 let currentFilter = 'all';
+let currentUser = null;
+let unsubscribe = null;
 
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(people)); }
+function googleLogin() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(function(err) {
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+      auth.signInWithRedirect(provider);
+    }
+  });
+}
+
+function logout() {
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(async function(user) {
+  currentUser = user;
+  if (user) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'block';
+    document.getElementById('userBar').style.display = 'flex';
+    document.getElementById('userName').textContent = user.displayName || 'ユーザー';
+    if (user.photoURL) document.getElementById('userPhoto').src = user.photoURL;
+
+    var localData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (localData.length > 0) {
+      var batch = db.batch();
+      localData.forEach(function(p) {
+        var ref = db.collection('users').doc(user.uid).collection('people').doc(p.id);
+        batch.set(ref, p, { merge: true });
+      });
+      await batch.commit();
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    startListener();
+  } else {
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+    document.getElementById('userBar').style.display = 'none';
+    people = [];
+  }
+});
+
+function startListener() {
+  if (unsubscribe) unsubscribe();
+  unsubscribe = db.collection('users').doc(currentUser.uid).collection('people')
+    .onSnapshot(function(snapshot) {
+      people = [];
+      snapshot.forEach(function(doc) { people.push(Object.assign({}, doc.data(), { id: doc.id })); });
+      people.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+      render();
+    });
+}
 
 function showForm(id) {
-  const f = document.getElementById('formCard');
+  var f = document.getElementById('formCard');
   f.classList.add('show');
   if (id) {
-    const p = people.find(x => x.id === id);
+    var p = people.find(function(x) { return x.id === id; });
     if (!p) return;
     document.getElementById('editId').value = id;
     document.getElementById('fDate').value = p.date;
@@ -267,8 +369,8 @@ function showForm(id) {
     document.getElementById('fNextDate').value = p.nextDate || '';
     document.getElementById('fNextTime').value = p.nextTime || '';
     document.getElementById('fNextPlace').value = p.nextPlace || '';
-    document.getElementById('fFeatures').value = p.features;
-    document.getElementById('fMemo').value = p.memo;
+    document.getElementById('fFeatures').value = p.features || '';
+    document.getElementById('fMemo').value = p.memo || '';
   } else {
     document.getElementById('editId').value = '';
     document.getElementById('fDate').value = new Date().toISOString().slice(0, 10);
@@ -292,11 +394,11 @@ function hideForm() {
   document.getElementById('formCard').classList.remove('show');
 }
 
-function savePerson() {
-  const name = document.getElementById('fName').value.trim();
+async function savePerson() {
+  var name = document.getElementById('fName').value.trim();
   if (!name) { alert('名前を入力してね'); return; }
-  const editId = document.getElementById('editId').value;
-  const data = {
+  var editId = document.getElementById('editId').value;
+  var data = {
     id: editId || Date.now().toString(),
     date: document.getElementById('fDate').value,
     name: name,
@@ -312,138 +414,117 @@ function savePerson() {
     nextPlace: document.getElementById('fNextPlace').value.trim(),
     memo: document.getElementById('fMemo').value.trim()
   };
-  if (editId) {
-    const idx = people.findIndex(x => x.id === editId);
-    if (idx >= 0) people[idx] = data;
-  } else {
-    people.unshift(data);
-  }
-  save();
+  await db.collection('users').doc(currentUser.uid).collection('people').doc(data.id).set(data);
   hideForm();
-  render();
 }
 
-function deletePerson(id) {
+async function deletePerson(id) {
   if (!confirm('削除してもいい？')) return;
-  people = people.filter(x => x.id !== id);
-  save();
-  render();
+  await db.collection('users').doc(currentUser.uid).collection('people').doc(id).delete();
 }
 
 function renderSchedule() {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const upcoming = people
-    .filter(p => p.nextDate)
-    .map(p => {
-      const d = new Date(p.nextDate + 'T00:00:00');
-      const diff = Math.round((d - today) / 86400000);
-      return { ...p, nextDateObj: d, daysLeft: diff };
+  var today = new Date(); today.setHours(0,0,0,0);
+  var upcoming = people
+    .filter(function(p) { return p.nextDate; })
+    .map(function(p) {
+      var d = new Date(p.nextDate + 'T00:00:00');
+      var diff = Math.round((d - today) / 86400000);
+      return Object.assign({}, p, { nextDateObj: d, daysLeft: diff });
     })
-    .filter(s => s.daysLeft >= 0)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
+    .filter(function(s) { return s.daysLeft >= 0; })
+    .sort(function(a, b) { return a.daysLeft - b.daysLeft; });
 
-  const sec = document.getElementById('scheduleSection');
+  var sec = document.getElementById('scheduleSection');
   if (upcoming.length === 0) {
-    sec.innerHTML = `<div class="schedule-title">今後の予定</div><div class="schedule-empty">予定はまだないよ</div>`;
+    sec.innerHTML = '<div class="schedule-title">今後の予定</div><div class="schedule-empty">予定はまだないよ</div>';
     return;
   }
 
-  sec.innerHTML = `<div class="schedule-title">今後の予定（${upcoming.length}件）</div><div class="schedule-list">` +
-    upcoming.map(s => {
-      const m = s.nextDateObj.getMonth() + 1;
-      const d = s.nextDateObj.getDate();
-      let daysLabel, daysClass;
+  sec.innerHTML = '<div class="schedule-title">今後の予定（' + upcoming.length + '件）</div><div class="schedule-list">' +
+    upcoming.map(function(s) {
+      var m = s.nextDateObj.getMonth() + 1;
+      var d = s.nextDateObj.getDate();
+      var daysLabel, daysClass;
       if (s.daysLeft === 0) { daysLabel = '今日！'; daysClass = 'today'; }
       else if (s.daysLeft === 1) { daysLabel = '明日'; daysClass = 'tomorrow'; }
-      else if (s.daysLeft <= 7) { daysLabel = `あと${s.daysLeft}日`; daysClass = 'soon'; }
-      else { daysLabel = `あと${s.daysLeft}日`; daysClass = 'later'; }
-      const timeStr = s.nextTime ? s.nextTime.slice(0,5) : '';
-      return `
-      <div class="schedule-item" onclick="showForm('${s.id}')">
-        <div class="schedule-date-box">
-          <div class="s-month">${m}月</div>
-          <div class="s-day">${d}</div>
-        </div>
-        <div class="schedule-info">
-          <div class="schedule-name">${esc(s.name)}さん</div>
-          <div class="schedule-detail">
-            ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
-            ${s.nextPlace ? `<span>📍 ${esc(s.nextPlace)}</span>` : ''}
-          </div>
-        </div>
-        <div class="schedule-days-left ${daysClass}">${daysLabel}</div>
-      </div>`;
+      else if (s.daysLeft <= 7) { daysLabel = 'あと' + s.daysLeft + '日'; daysClass = 'soon'; }
+      else { daysLabel = 'あと' + s.daysLeft + '日'; daysClass = 'later'; }
+      var timeStr = s.nextTime ? s.nextTime.slice(0,5) : '';
+      return '<div class="schedule-item" onclick="showForm(\'' + s.id + '\')">' +
+        '<div class="schedule-date-box"><div class="s-month">' + m + '月</div><div class="s-day">' + d + '</div></div>' +
+        '<div class="schedule-info"><div class="schedule-name">' + esc(s.name) + 'さん</div>' +
+        '<div class="schedule-detail">' +
+        (timeStr ? '<span>🕐 ' + timeStr + '</span>' : '') +
+        (s.nextPlace ? '<span>📍 ' + esc(s.nextPlace) + '</span>' : '') +
+        '</div></div>' +
+        '<div class="schedule-days-left ' + daysClass + '">' + daysLabel + '</div></div>';
     }).join('') + '</div>';
 }
 
 function render() {
-  const filtered = currentFilter === 'all' ? people : people.filter(p => p.status === currentFilter);
+  var filtered = currentFilter === 'all' ? people : people.filter(function(p) { return p.status === currentFilter; });
 
   document.getElementById('totalCount').textContent = people.length;
-  document.getElementById('activeCount').textContent = people.filter(p => p.status === 'talking').length;
-  document.getElementById('datingCount').textContent = people.filter(p => p.status === 'dating').length;
-  document.getElementById('goodCount').textContent = people.filter(p => p.status === 'good').length;
+  document.getElementById('activeCount').textContent = people.filter(function(p) { return p.status === 'talking'; }).length;
+  document.getElementById('datingCount').textContent = people.filter(function(p) { return p.status === 'dating'; }).length;
+  document.getElementById('goodCount').textContent = people.filter(function(p) { return p.status === 'good'; }).length;
 
   renderSchedule();
 
-  const list = document.getElementById('personList');
+  var list = document.getElementById('personList');
   if (filtered.length === 0) {
     list.innerHTML = '<div class="empty">まだ記録がないよ<br>上のボタンから追加してみよう</div>';
     return;
   }
 
-  list.innerHTML = filtered.map(p => {
-    const dateStr = p.date ? new Date(p.date + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }) : '';
-    let nextDateHtml = '';
+  list.innerHTML = filtered.map(function(p) {
+    var dateStr = p.date ? new Date(p.date + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }) : '';
+    var nextDateHtml = '';
     if (p.nextDate) {
-      const nd = new Date(p.nextDate + 'T00:00:00');
-      const todayD = new Date(); todayD.setHours(0,0,0,0);
-      const diff = Math.round((nd - todayD) / 86400000);
+      var nd = new Date(p.nextDate + 'T00:00:00');
+      var todayD = new Date(); todayD.setHours(0,0,0,0);
+      var diff = Math.round((nd - todayD) / 86400000);
       if (diff >= 0) {
-        const ndStr = nd.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
-        const timeStr = p.nextTime ? p.nextTime.slice(0,5) : '';
-        nextDateHtml = `<div class="next-date-section">
-          <div class="next-date-label">次のデート</div>
-          <div class="next-date-info">
-            <span>📅 ${ndStr}</span>
-            ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
-            ${p.nextPlace ? `<span>📍 ${esc(p.nextPlace)}</span>` : ''}
-          </div>
-        </div>`;
+        var ndStr = nd.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+        var timeStr = p.nextTime ? p.nextTime.slice(0,5) : '';
+        nextDateHtml = '<div class="next-date-section">' +
+          '<div class="next-date-label">次のデート</div>' +
+          '<div class="next-date-info">' +
+          '<span>📅 ' + ndStr + '</span>' +
+          (timeStr ? '<span>🕐 ' + timeStr + '</span>' : '') +
+          (p.nextPlace ? '<span>📍 ' + esc(p.nextPlace) + '</span>' : '') +
+          '</div></div>';
       }
     }
-    return `
-    <div class="person-card">
-      <div class="card-actions">
-        <button class="btn-edit" onclick="showForm('${p.id}')" title="編集">&#9998;</button>
-        <button class="btn-delete" onclick="deletePerson('${p.id}')" title="削除">&#10005;</button>
-      </div>
-      <div class="card-top">
-        <span class="card-name">${esc(p.name)}</span>
-        <span class="card-date">${dateStr}</span>
-      </div>
-      <div class="card-tags">
-        <span class="tag tag-method ${p.method}">${METHOD_LABELS[p.method] || p.method}</span>
-        <span class="tag tag-status ${p.status}">${STATUS_LABELS[p.status] || p.status}</span>
-      </div>
-      ${(p.age || p.area || p.job || p.income) ? `<div class="card-profile">
-        ${p.age ? `<span class="profile-item">${esc(p.age)}</span>` : ''}
-        ${p.area ? `<span class="profile-item">${esc(p.area)}</span>` : ''}
-        ${p.job ? `<span class="profile-item">${esc(p.job)}</span>` : ''}
-        ${p.income ? `<span class="profile-item">${esc(p.income)}</span>` : ''}
-      </div>` : ''}
-      ${p.features ? `<div class="card-features">${esc(p.features)}</div>` : ''}
-      ${p.memo ? `<div class="card-memo">${esc(p.memo)}</div>` : ''}
-      ${nextDateHtml}
-    </div>`;
+    return '<div class="person-card">' +
+      '<div class="card-actions">' +
+      '<button class="btn-edit" onclick="showForm(\'' + p.id + '\')" title="編集">&#9998;</button>' +
+      '<button class="btn-delete" onclick="deletePerson(\'' + p.id + '\')" title="削除">&#10005;</button>' +
+      '</div>' +
+      '<div class="card-top"><span class="card-name">' + esc(p.name) + '</span><span class="card-date">' + dateStr + '</span></div>' +
+      '<div class="card-tags">' +
+      '<span class="tag tag-method ' + p.method + '">' + (METHOD_LABELS[p.method] || p.method) + '</span>' +
+      '<span class="tag tag-status ' + p.status + '">' + (STATUS_LABELS[p.status] || p.status) + '</span>' +
+      '</div>' +
+      ((p.age || p.area || p.job || p.income) ? '<div class="card-profile">' +
+        (p.age ? '<span class="profile-item">' + esc(p.age) + '</span>' : '') +
+        (p.area ? '<span class="profile-item">' + esc(p.area) + '</span>' : '') +
+        (p.job ? '<span class="profile-item">' + esc(p.job) + '</span>' : '') +
+        (p.income ? '<span class="profile-item">' + esc(p.income) + '</span>' : '') +
+        '</div>' : '') +
+      (p.features ? '<div class="card-features">' + esc(p.features) + '</div>' : '') +
+      (p.memo ? '<div class="card-memo">' + esc(p.memo) + '</div>' : '') +
+      nextDateHtml +
+      '</div>';
   }).join('');
 }
 
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+document.querySelectorAll('.filter-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
     currentFilter = btn.dataset.filter;
     render();
@@ -451,28 +532,26 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 });
 
 function exportCSV() {
-  const header = '日付,名前,出会い方,ステータス,年齢,居住地,職業,年収,特徴,次の予定日,時間,場所,メモ';
-  const rows = people.map(p =>
-    [p.date, p.name, METHOD_LABELS[p.method], STATUS_LABELS[p.status], p.age, p.area, p.job, p.income, p.features, p.nextDate, p.nextTime, p.nextPlace, p.memo]
-      .map(v => '"' + (v || '').replace(/"/g, '""') + '"').join(',')
-  );
-  const csv = '﻿' + header + '\n' + rows.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
+  var header = '日付,名前,出会い方,ステータス,年齢,居住地,職業,年収,特徴,次の予定日,時間,場所,メモ';
+  var rows = people.map(function(p) {
+    return [p.date, p.name, METHOD_LABELS[p.method], STATUS_LABELS[p.status], p.age, p.area, p.job, p.income, p.features, p.nextDate, p.nextTime, p.nextPlace, p.memo]
+      .map(function(v) { return '"' + (v || '').replace(/"/g, '""') + '"'; }).join(',');
+  });
+  var csv = '﻿' + header + '\n' + rows.join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = '婚活ノート.csv';
   a.click();
 }
 
 function exportClipboard() {
-  const lines = people.map(p =>
-    `${p.date}\t${p.name}\t${METHOD_LABELS[p.method]}\t${STATUS_LABELS[p.status]}\t${p.age||''}\t${p.area||''}\t${p.job||''}\t${p.income||''}\t${p.features}\t${p.nextDate||''}\t${p.nextTime||''}\t${p.nextPlace||''}\t${p.memo}`
-  );
-  const text = '日付\t名前\t出会い方\tステータス\t年齢\t居住地\t職業\t年収\t特徴\t次の予定日\t時間\t場所\tメモ\n' + lines.join('\n');
-  navigator.clipboard.writeText(text).then(() => alert('コピーしました！\nGoogleスプレッドシートにそのまま貼り付けできます'));
+  var lines = people.map(function(p) {
+    return [p.date, p.name, METHOD_LABELS[p.method], STATUS_LABELS[p.status], p.age||'', p.area||'', p.job||'', p.income||'', p.features, p.nextDate||'', p.nextTime||'', p.nextPlace||'', p.memo].join('\t');
+  });
+  var text = '日付\t名前\t出会い方\tステータス\t年齢\t居住地\t職業\t年収\t特徴\t次の予定日\t時間\t場所\tメモ\n' + lines.join('\n');
+  navigator.clipboard.writeText(text).then(function() { alert('コピーしました！\nGoogleスプレッドシートにそのまま貼り付けできます'); });
 }
-
-render();
 </script>
 </body>
 </html>
