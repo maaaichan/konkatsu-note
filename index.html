@@ -86,6 +86,31 @@ body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hirag
 .card-profile { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .profile-item { font-size: 12px; color: #8c6278; background: rgba(212,97,155,0.08); padding: 2px 8px; border-radius: 8px; }
 
+.schedule-section { margin-bottom: 16px; }
+.schedule-title { font-size: 14px; font-weight: 700; color: #d4619b; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.schedule-title::before { content: '📅'; }
+.schedule-list { display: flex; flex-direction: column; gap: 6px; }
+.schedule-item { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #fff 0%, #fff5f8 100%); border-radius: 14px; padding: 12px 14px; box-shadow: 0 2px 8px rgba(212,97,155,0.10); border: 1px solid #f9dae8; cursor: pointer; transition: transform 0.15s; }
+.schedule-item:hover { transform: translateY(-1px); box-shadow: 0 3px 12px rgba(212,97,155,0.16); }
+.schedule-date-box { min-width: 48px; text-align: center; background: linear-gradient(135deg, #e88ab4, #d4619b); border-radius: 10px; padding: 6px 8px; color: #fff; }
+.schedule-date-box .s-month { font-size: 10px; font-weight: 700; line-height: 1; }
+.schedule-date-box .s-day { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.schedule-info { flex: 1; min-width: 0; }
+.schedule-name { font-size: 14px; font-weight: 700; color: #4a3040; }
+.schedule-detail { font-size: 12px; color: #a07890; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+.schedule-detail span { display: flex; align-items: center; gap: 3px; }
+.schedule-days-left { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 10px; white-space: nowrap; }
+.schedule-days-left.today { background: #fce4ec; color: #e91e63; }
+.schedule-days-left.tomorrow { background: #fff3e0; color: #ff9800; }
+.schedule-days-left.soon { background: #e3f2fd; color: #1e88e5; }
+.schedule-days-left.later { background: #f3e5f5; color: #9c27b0; }
+.schedule-empty { text-align: center; padding: 16px; font-size: 13px; color: #deb8cc; background: rgba(255,255,255,0.5); border-radius: 14px; border: 1px dashed #f4c2d7; }
+
+.next-date-section { margin-top: 4px; padding-top: 10px; border-top: 1px dashed #f4c2d7; }
+.next-date-label { font-size: 11px; font-weight: 700; color: #d4619b; margin-bottom: 4px; }
+.next-date-info { font-size: 12px; color: #6d4a5e; display: flex; gap: 8px; flex-wrap: wrap; }
+.next-date-info span { display: flex; align-items: center; gap: 3px; }
+
 .export-bar { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
 .export-btn { padding: 8px 16px; border-radius: 12px; border: 2px solid #f4c2d7; background: #fff; font-size: 12px; font-weight: 700; color: #c0507e; cursor: pointer; font-family: inherit; transition: all 0.2s; }
 .export-btn:hover { background: #fce4ec; }
@@ -104,6 +129,8 @@ body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hirag
     <div class="stat-card"><div class="stat-num" id="datingCount">0</div><div class="stat-label">デート済</div></div>
     <div class="stat-card"><div class="stat-num" id="goodCount">0</div><div class="stat-label">いい感じ</div></div>
   </div>
+
+  <div class="schedule-section" id="scheduleSection"></div>
 
   <div class="filter-bar">
     <button class="filter-btn active" data-filter="all">すべて</button>
@@ -178,6 +205,22 @@ body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hirag
       </div>
     </div>
     <div class="form-row">
+      <div class="form-group">
+        <label>次会う日</label>
+        <input type="date" id="fNextDate">
+      </div>
+      <div class="form-group">
+        <label>時間</label>
+        <input type="time" id="fNextTime">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group full">
+        <label>場所</label>
+        <input type="text" id="fNextPlace" placeholder="渋谷ヒカリエ 7Fカフェ">
+      </div>
+    </div>
+    <div class="form-row">
       <div class="form-group full">
         <label>やったこと・メモ</label>
         <textarea id="fMemo" placeholder="6/15 カフェでお茶した。猫好き。次は映画行く予定"></textarea>
@@ -221,6 +264,9 @@ function showForm(id) {
     document.getElementById('fArea').value = p.area || '';
     document.getElementById('fJob').value = p.job || '';
     document.getElementById('fIncome').value = p.income || '';
+    document.getElementById('fNextDate').value = p.nextDate || '';
+    document.getElementById('fNextTime').value = p.nextTime || '';
+    document.getElementById('fNextPlace').value = p.nextPlace || '';
     document.getElementById('fFeatures').value = p.features;
     document.getElementById('fMemo').value = p.memo;
   } else {
@@ -233,6 +279,9 @@ function showForm(id) {
     document.getElementById('fArea').value = '';
     document.getElementById('fJob').value = '';
     document.getElementById('fIncome').value = '';
+    document.getElementById('fNextDate').value = '';
+    document.getElementById('fNextTime').value = '';
+    document.getElementById('fNextPlace').value = '';
     document.getElementById('fFeatures').value = '';
     document.getElementById('fMemo').value = '';
   }
@@ -258,6 +307,9 @@ function savePerson() {
     job: document.getElementById('fJob').value.trim(),
     income: document.getElementById('fIncome').value.trim(),
     features: document.getElementById('fFeatures').value.trim(),
+    nextDate: document.getElementById('fNextDate').value,
+    nextTime: document.getElementById('fNextTime').value,
+    nextPlace: document.getElementById('fNextPlace').value.trim(),
     memo: document.getElementById('fMemo').value.trim()
   };
   if (editId) {
@@ -278,6 +330,52 @@ function deletePerson(id) {
   render();
 }
 
+function renderSchedule() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const upcoming = people
+    .filter(p => p.nextDate)
+    .map(p => {
+      const d = new Date(p.nextDate + 'T00:00:00');
+      const diff = Math.round((d - today) / 86400000);
+      return { ...p, nextDateObj: d, daysLeft: diff };
+    })
+    .filter(s => s.daysLeft >= 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
+  const sec = document.getElementById('scheduleSection');
+  if (upcoming.length === 0) {
+    sec.innerHTML = `<div class="schedule-title">今後の予定</div><div class="schedule-empty">予定はまだないよ</div>`;
+    return;
+  }
+
+  sec.innerHTML = `<div class="schedule-title">今後の予定（${upcoming.length}件）</div><div class="schedule-list">` +
+    upcoming.map(s => {
+      const m = s.nextDateObj.getMonth() + 1;
+      const d = s.nextDateObj.getDate();
+      let daysLabel, daysClass;
+      if (s.daysLeft === 0) { daysLabel = '今日！'; daysClass = 'today'; }
+      else if (s.daysLeft === 1) { daysLabel = '明日'; daysClass = 'tomorrow'; }
+      else if (s.daysLeft <= 7) { daysLabel = `あと${s.daysLeft}日`; daysClass = 'soon'; }
+      else { daysLabel = `あと${s.daysLeft}日`; daysClass = 'later'; }
+      const timeStr = s.nextTime ? s.nextTime.slice(0,5) : '';
+      return `
+      <div class="schedule-item" onclick="showForm('${s.id}')">
+        <div class="schedule-date-box">
+          <div class="s-month">${m}月</div>
+          <div class="s-day">${d}</div>
+        </div>
+        <div class="schedule-info">
+          <div class="schedule-name">${esc(s.name)}さん</div>
+          <div class="schedule-detail">
+            ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
+            ${s.nextPlace ? `<span>📍 ${esc(s.nextPlace)}</span>` : ''}
+          </div>
+        </div>
+        <div class="schedule-days-left ${daysClass}">${daysLabel}</div>
+      </div>`;
+    }).join('') + '</div>';
+}
+
 function render() {
   const filtered = currentFilter === 'all' ? people : people.filter(p => p.status === currentFilter);
 
@@ -285,6 +383,8 @@ function render() {
   document.getElementById('activeCount').textContent = people.filter(p => p.status === 'talking').length;
   document.getElementById('datingCount').textContent = people.filter(p => p.status === 'dating').length;
   document.getElementById('goodCount').textContent = people.filter(p => p.status === 'good').length;
+
+  renderSchedule();
 
   const list = document.getElementById('personList');
   if (filtered.length === 0) {
@@ -294,6 +394,24 @@ function render() {
 
   list.innerHTML = filtered.map(p => {
     const dateStr = p.date ? new Date(p.date + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' }) : '';
+    let nextDateHtml = '';
+    if (p.nextDate) {
+      const nd = new Date(p.nextDate + 'T00:00:00');
+      const todayD = new Date(); todayD.setHours(0,0,0,0);
+      const diff = Math.round((nd - todayD) / 86400000);
+      if (diff >= 0) {
+        const ndStr = nd.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+        const timeStr = p.nextTime ? p.nextTime.slice(0,5) : '';
+        nextDateHtml = `<div class="next-date-section">
+          <div class="next-date-label">次のデート</div>
+          <div class="next-date-info">
+            <span>📅 ${ndStr}</span>
+            ${timeStr ? `<span>🕐 ${timeStr}</span>` : ''}
+            ${p.nextPlace ? `<span>📍 ${esc(p.nextPlace)}</span>` : ''}
+          </div>
+        </div>`;
+      }
+    }
     return `
     <div class="person-card">
       <div class="card-actions">
@@ -316,6 +434,7 @@ function render() {
       </div>` : ''}
       ${p.features ? `<div class="card-features">${esc(p.features)}</div>` : ''}
       ${p.memo ? `<div class="card-memo">${esc(p.memo)}</div>` : ''}
+      ${nextDateHtml}
     </div>`;
   }).join('');
 }
@@ -332,9 +451,9 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 });
 
 function exportCSV() {
-  const header = '日付,名前,出会い方,ステータス,年齢,居住地,職業,年収,特徴,メモ';
+  const header = '日付,名前,出会い方,ステータス,年齢,居住地,職業,年収,特徴,次の予定日,時間,場所,メモ';
   const rows = people.map(p =>
-    [p.date, p.name, METHOD_LABELS[p.method], STATUS_LABELS[p.status], p.age, p.area, p.job, p.income, p.features, p.memo]
+    [p.date, p.name, METHOD_LABELS[p.method], STATUS_LABELS[p.status], p.age, p.area, p.job, p.income, p.features, p.nextDate, p.nextTime, p.nextPlace, p.memo]
       .map(v => '"' + (v || '').replace(/"/g, '""') + '"').join(',')
   );
   const csv = '﻿' + header + '\n' + rows.join('\n');
@@ -347,9 +466,9 @@ function exportCSV() {
 
 function exportClipboard() {
   const lines = people.map(p =>
-    `${p.date}\t${p.name}\t${METHOD_LABELS[p.method]}\t${STATUS_LABELS[p.status]}\t${p.age||''}\t${p.area||''}\t${p.job||''}\t${p.income||''}\t${p.features}\t${p.memo}`
+    `${p.date}\t${p.name}\t${METHOD_LABELS[p.method]}\t${STATUS_LABELS[p.status]}\t${p.age||''}\t${p.area||''}\t${p.job||''}\t${p.income||''}\t${p.features}\t${p.nextDate||''}\t${p.nextTime||''}\t${p.nextPlace||''}\t${p.memo}`
   );
-  const text = '日付\t名前\t出会い方\tステータス\t年齢\t居住地\t職業\t年収\t特徴\tメモ\n' + lines.join('\n');
+  const text = '日付\t名前\t出会い方\tステータス\t年齢\t居住地\t職業\t年収\t特徴\t次の予定日\t時間\t場所\tメモ\n' + lines.join('\n');
   navigator.clipboard.writeText(text).then(() => alert('コピーしました！\nGoogleスプレッドシートにそのまま貼り付けできます'));
 }
 
