@@ -73,12 +73,17 @@ body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hirag
 .card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .tag { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
 .tag-method { background: #e8f5e9; color: #4caf50; }
-.tag-method.app { background: #e3f2fd; color: #2196f3; }
+.tag-method.pairs { background: #fce4ec; color: #e4407f; }
+.tag-method.with { background: #f3e5f5; color: #9c27b0; }
+.tag-method.gorgeous { background: #fff8e1; color: #c79100; }
+.tag-method.bachelor { background: #e8eaf6; color: #3f51b5; }
+.tag-method.machikon { background: #ede7f6; color: #7e57c2; }
+.tag-method.goukon { background: #e0f7fa; color: #00acc1; }
 .tag-method.intro { background: #fff3e0; color: #ff9800; }
+.tag-method.other { background: #f5f5f5; color: #9e9e9e; }
+.tag-method.app { background: #e3f2fd; color: #2196f3; }
 .tag-method.event { background: #f3e5f5; color: #9c27b0; }
 .tag-method.work { background: #fce4ec; color: #e91e63; }
-.tag-method.machikon { background: #ede7f6; color: #7e57c2; }
-.tag-method.other { background: #f5f5f5; color: #9e9e9e; }
 
 .tag-status { font-weight: 700; }
 .tag-status.talking { background: #e3f2fd; color: #1e88e5; }
@@ -194,12 +199,18 @@ body { font-family: 'Zen Maru Gothic', -apple-system, BlinkMacSystemFont, 'Hirag
       <div class="form-group">
         <label>出会い方</label>
         <select id="fMethod">
-          <option value="app">アプリ</option>
-          <option value="intro">紹介</option>
-          <option value="machikon">街コン</option>
-          <option value="event">イベント・合コン</option>
-          <option value="work">仕事関係</option>
-          <option value="other">その他</option>
+          <optgroup label="マッチングアプリ">
+            <option value="pairs">Pairs</option>
+            <option value="with">with</option>
+            <option value="gorgeous">ゴージャス</option>
+            <option value="bachelor">バチェラーデート</option>
+          </optgroup>
+          <optgroup label="その他">
+            <option value="machikon">街コン</option>
+            <option value="goukon">合コン</option>
+            <option value="intro">紹介</option>
+            <option value="other">その他</option>
+          </optgroup>
         </select>
       </div>
       <div class="form-group">
@@ -290,7 +301,12 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 const STORAGE_KEY = 'deai-note-data';
-const METHOD_LABELS = { app: 'アプリ', intro: '紹介', machikon: '街コン', event: 'イベント', work: '仕事', other: 'その他' };
+const METHOD_LABELS = {
+  pairs: 'Pairs', with: 'with', gorgeous: 'ゴージャス', bachelor: 'バチェラーデート',
+  machikon: '街コン', goukon: '合コン', intro: '紹介', other: 'その他',
+  // 以下は以前の項目（過去の記録を表示するために残しています）
+  app: 'アプリ', event: 'イベント', work: '仕事'
+};
 const STATUS_LABELS = { talking: 'やりとり中', dating: 'デート済', good: 'いい感じ', pending: '保留', ended: '終了' };
 let people = [];
 let currentFilter = 'all';
@@ -360,7 +376,16 @@ function showForm(id) {
     document.getElementById('editId').value = id;
     document.getElementById('fDate').value = p.date;
     document.getElementById('fName').value = p.name;
-    document.getElementById('fMethod').value = p.method;
+    var mSel = document.getElementById('fMethod');
+    mSel.value = p.method;
+    // 以前の項目（アプリ・イベント等）で保存された記録も選択肢に出す
+    if (mSel.value !== p.method) {
+      var op = document.createElement('option');
+      op.value = p.method;
+      op.textContent = (METHOD_LABELS[p.method] || p.method) + '（以前の項目）';
+      mSel.appendChild(op);
+      mSel.value = p.method;
+    }
     document.getElementById('fStatus').value = p.status;
     document.getElementById('fAge').value = p.age || '';
     document.getElementById('fArea').value = p.area || '';
@@ -375,7 +400,7 @@ function showForm(id) {
     document.getElementById('editId').value = '';
     document.getElementById('fDate').value = new Date().toISOString().slice(0, 10);
     document.getElementById('fName').value = '';
-    document.getElementById('fMethod').value = 'app';
+    document.getElementById('fMethod').value = 'pairs';
     document.getElementById('fStatus').value = 'talking';
     document.getElementById('fAge').value = '';
     document.getElementById('fArea').value = '';
